@@ -1,0 +1,47 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+model Player {
+  id       String   @id @default(cuid())
+  username String   @unique
+  trophies Int      @default(0)
+  decks    Deck[]
+
+  // These relations link the Player to Match
+  matchesAsPlayer1 Match[] @relation("MatchesAsPlayer1")
+  matchesAsPlayer2 Match[] @relation("MatchesAsPlayer2")
+  matchesAsWinner  Match[] @relation("MatchesAsWinner")
+}
+
+model Deck {
+  id        String @id @default(cuid())
+  playerId  String
+  player    Player @relation(fields: [playerId], references: [id])
+  cards     String // JSON-encoded array of cards
+
+  @@index([playerId])
+}
+
+model Match {
+  id        String   @id @default(cuid())
+  player1Id String
+  player2Id String
+  winnerId  String?
+  playedAt  DateTime @default(now())
+
+  // Relation fields pointing back to Player
+  player1 Player @relation("MatchesAsPlayer1", fields: [player1Id], references: [id])
+  player2 Player @relation("MatchesAsPlayer2", fields: [player2Id], references: [id])
+  winner  Player? @relation("MatchesAsWinner", fields: [winnerId], references: [id])
+}
