@@ -10,20 +10,18 @@ function App() {
     const [inGame, setInGame] = useState(false);
     const [gameState, setGameState] = useState(null);
     const [playerIndex, setPlayerIndex] = useState(null);
+    const [selectedCard, setSelectedCard] = useState(null);
 
     useEffect(() => {
         async function authenticate() {
-            // Prompt for username
             const username = prompt("Enter a username:", "alice");
             if (!username) return;
 
-            // Call backend to get playerId
             const res = await fetch('http://localhost:4000/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username })
             });
-
             const data = await res.json();
             if (data.success) {
                 setPlayerId(data.playerId);
@@ -37,10 +35,7 @@ function App() {
 
     useEffect(() => {
         if (playerId) {
-            // Once we have a playerId, identify the socket
             socket.emit('identify', playerId);
-
-            // Join queue to start a match
             socket.emit('join_queue');
 
             socket.on('game_start', (data) => {
@@ -65,8 +60,15 @@ function App() {
         }
     }, [playerId]);
 
-    const handlePlayCard = (cardData) => {
+    const handleSelectCard = (card) => {
+        setSelectedCard(card);
+    };
+
+    const handlePlayCardAtPosition = (card, position) => {
+        // Emit the play_card event with the chosen position
+        const cardData = { ...card, position };
         socket.emit('play_card', cardData);
+        setSelectedCard(null); // Clear the selected card
     };
 
     return (
@@ -76,8 +78,14 @@ function App() {
             {playerId && !inGame && <div>Waiting for match...</div>}
             {inGame && (
                 <>
-                    <Battlefield gameState={gameState} playerIndex={playerIndex} />
-                    <CardBar onCardClick={handlePlayCard} />
+                    <Battlefield
+                        gameState={gameState}
+                        playerIndex={playerIndex}
+                        selectedCard={selectedCard}
+                        onPlayCardAtPosition={handlePlayCardAtPosition}
+                    />
+                    <CardBar onSelectCard={handleSelectCard} />
+                    {selectedCard && <div style={{ textAlign: 'center', marginTop: '10px' }}>Now click on the battlefield to place your {selectedCard.unitType}!</div>}
                 </>
             )}
         </div>

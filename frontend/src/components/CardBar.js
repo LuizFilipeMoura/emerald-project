@@ -1,6 +1,6 @@
 import React from 'react';
 
-function CardBar({ onCardClick }) {
+function CardBar({ onSelectCard }) {
     const cards = [
         { unitType: 'knight', cost: 3 },
         { unitType: 'archer', cost: 2 },
@@ -13,7 +13,7 @@ function CardBar({ onCardClick }) {
             {cards.map((card, idx) => (
                 <div
                     key={idx}
-                    onClick={() => onCardClick(card)}
+                    onClick={() => onSelectCard(card)}
                     style={{
                         width: '60px',
                         height: '90px',

@@ -47,29 +47,23 @@ class GameEngine {
     }
 
     playCard(playerId, cardData) {
+
         const playerIndex = this.players.findIndex(p => p.id === playerId);
         if (playerIndex === -1) return;
 
-        // Check if player has enough elixir to play the card
-        if (this.state.elixir[playerIndex] < cardData.cost) return;
-
-        // Deduct elixir
-        this.state.elixir[playerIndex] -= cardData.cost;
-
-        // Create a new unit with initial position depending on player team
-        const x = playerIndex === 0 ? 100 : 500;
-        const y = playerIndex === 0 ? 600 : 200;
+        const { cost, position, unitType } = cardData;
+        if (this.state.elixir[playerIndex] < cost) return;
+        this.state.elixir[playerIndex] -= cost;
 
         const newUnit = new Unit({
             id: uuidv4(),
-            x,
-            y,
+            x: position.x,
+            y: position.y,
             team: playerIndex,
             health: 500,
             damage: 50,
-            speed: 1
+            speed: 1,
         });
-
         this.state.units.push(newUnit);
     }
 

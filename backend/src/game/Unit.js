@@ -1,5 +1,5 @@
 class Unit {
-    constructor({ id, x, y, team, health, damage, speed }) {
+    constructor({id, x, y, team, health, damage, speed}) {
         this.id = id;
         this.x = x;
         this.y = y;
@@ -10,7 +10,7 @@ class Unit {
     }
 
     update() {
-        // Additional logic if needed
+        this.y += this.team === 0 ? -this.speed : this.speed;
     }
 
     serialize() {

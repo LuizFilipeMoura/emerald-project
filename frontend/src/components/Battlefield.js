@@ -1,14 +1,35 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import Tower from './Tower';
 import Unit from './Unit';
 
-function Battlefield({ gameState, playerIndex }) {
+function Battlefield({ gameState, playerIndex, selectedCard, onPlayCardAtPosition }) {
+    const battlefieldRef = useRef(null);
+
     if (!gameState) return <div>Loading game state...</div>;
 
     const { towers, units, elixir } = gameState;
 
+
+    const handleBattlefieldClick = (e) => {
+        console.log(e)
+        if (selectedCard) {
+            // Calculate click position relative to battlefield
+            const rect = battlefieldRef.current.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            console.log("x: ", x, "y: ", y)
+
+            // Emit event through parent handler
+            onPlayCardAtPosition(selectedCard, { x, y });
+        }
+    };
+
     return (
-        <div style={{ position: 'relative', width: '600px', height: '800px', background: '#4AA96C', margin: '20px auto' }}>
+        <div
+            ref={battlefieldRef}
+            onClick={handleBattlefieldClick}
+            style={{ position: 'relative', width: '600px', height: '800px', background: '#4AA96C', margin: '20px auto' }}
+        >
             {Object.keys(towers).map((towerKey) => {
                 const t = towers[towerKey];
                 return (

@@ -4,6 +4,7 @@ import { Server as SocketIO } from 'socket.io';
 import { PrismaClient } from '@prisma/client';
 import cors from 'cors';
 import { v4 as uuidv4 } from 'uuid';
+import GameEngine from "./game/GameEngine.js";
 
 const prisma = new PrismaClient();
 
@@ -23,188 +24,8 @@ class Tower {
     }
 }
 
-class Unit {
-    constructor({ id, x, y, team, health, damage, speed }) {
-        this.id = id;
-        this.x = x;
-        this.y = y;
-        this.team = team;
-        this.health = health;
-        this.damage = damage;
-        this.speed = speed;
-    }
-
-    update() {
-        // Move units toward enemy territory
-        this.y += this.team === 0 ? -this.speed : this.speed;
-    }
-
-    serialize() {
-        return { id: this.id, x: this.x, y: this.y, team: this.team, health: this.health };
-    }
-}
 
 const TICK_RATE = 20;
-
-class GameEngine {
-    constructor(players, io) {
-        this.id = uuidv4();
-        this.io = io;
-        this.players = players; // array of 2 sockets
-        this.interval = null;
-        this.towers = {
-            leftKing: new Tower(150, 700, 3000, 0),
-            rightKing: new Tower(450, 100, 3000, 1)
-        };
-        this.units = [];
-        this.elixir = [5, 5]; // Player 0 and Player 1 elixir
-        this.roomName = `game_${this.id}`;
-        // Store player DB IDs for match record
-        this.playerIds = []; // Will be filled at game start
-    }
-
-    async start() {
-        // Assume each socket has playerId (from login)
-        this.playerIds = this.players.map(s => s.playerId);
-        // Create a match record
-        await prisma.match.create({
-            data: {
-                player1Id: this.playerIds[0],
-                player2Id: this.playerIds[1]
-            }
-        });
-
-        this.players.forEach((socket, index) => {
-            socket.join(this.roomName);
-            socket.emit('game_start', { gameId: this.id, playerIndex: index });
-        });
-
-        this.interval = setInterval(() => this.tick(), 1000 / TICK_RATE);
-    }
-
-    tick() {
-        this.updateUnits();
-        this.regenerateElixir();
-        this.checkCollisions();
-        this.checkGameOver();
-
-        const serializedState = this.serializeGameState();
-        this.io.to(this.roomName).emit('game_state', serializedState);
-    }
-
-    playCard(playerId, cardData) {
-        const playerIndex = this.players.findIndex(p => p.id === playerId);
-        if (playerIndex === -1) return;
-
-        if (this.elixir[playerIndex] < cardData.cost) return;
-        this.elixir[playerIndex] -= cardData.cost;
-
-        const x = playerIndex === 0 ? 150 : 450;
-        const y = playerIndex === 0 ? 600 : 200;
-
-        const newUnit = new Unit({
-            id: uuidv4(),
-            x,
-            y,
-            team: playerIndex,
-            health: 500,
-            damage: 50,
-            speed: 1
-        });
-        this.units.push(newUnit);
-    }
-
-    updateUnits() {
-        for (let unit of this.units) {
-            unit.update();
-        }
-        this.units = this.units.filter(u => u.health > 0);
-    }
-
-    regenerateElixir() {
-        for (let i = 0; i < this.elixir.length; i++) {
-            if (this.elixir[i] < 10) {
-                this.elixir[i] += 0.1;
-            }
-        }
-    }
-
-    checkCollisions() {
-        for (let unit of this.units) {
-            for (let towerName in this.towers) {
-                const tower = this.towers[towerName];
-                if (tower.team !== unit.team) {
-                    const dx = tower.x - unit.x;
-                    const dy = tower.y - unit.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 30) {
-                        // Unit attacks tower
-                        tower.health -= unit.damage;
-                    }
-                }
-            }
-        }
-    }
-
-    async checkGameOver() {
-        const leftKing = this.towers.leftKing;
-        const rightKing = this.towers.rightKing;
-
-        if (leftKing.health <= 0 || rightKing.health <= 0) {
-            const winnerIndex = leftKing.health <= 0 ? 1 : 0;
-            const winnerId = this.playerIds[winnerIndex];
-
-            await prisma.match.updateMany({
-                where: {
-                    player1Id: this.playerIds[0],
-                    player2Id: this.playerIds[1],
-                    winnerId: null
-                },
-                data: {
-                    winnerId
-                }
-            });
-
-            this.endGame(winnerIndex);
-        }
-    }
-
-    endGame(winnerIndex) {
-        clearInterval(this.interval);
-        this.io.to(this.roomName).emit('game_end', { winner: winnerIndex });
-        // Cleanup logic...
-    }
-
-    handlePlayerDisconnect(playerId) {
-        const disconnectedPlayerIndex = this.players.findIndex(p => p.id === playerId);
-        const winnerIndex = disconnectedPlayerIndex === 0 ? 1 : 0;
-        const winnerId = this.playerIds[winnerIndex];
-
-        prisma.match.updateMany({
-            where: {
-                player1Id: this.playerIds[0],
-                player2Id: this.playerIds[1],
-                winnerId: null
-            },
-            data: {
-                winnerId
-            }
-        }).catch(console.error);
-
-        this.endGame(winnerIndex);
-    }
-
-    serializeGameState() {
-        return {
-            towers: {
-                leftKing: this.towers.leftKing.serialize(),
-                rightKing: this.towers.rightKing.serialize()
-            },
-            units: this.units.map(u => u.serialize()),
-            elixir: this.elixir
-        };
-    }
-}
 
 // Basic in-memory matchmaking
 const waitingPlayers = [];
@@ -306,6 +127,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('play_card', (cardData) => {
+        console.log("card", cardData)
         const game = playerToGame.get(socket.id);
         if (game) {
             game.playCard(socket.id, cardData);
